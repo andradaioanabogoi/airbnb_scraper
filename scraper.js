@@ -13,7 +13,7 @@ const pagesToScrape = [
   "https://www.airbnb.co.uk/rooms/50633275",
 ];
 
-async function run_page(page, pageUrl) {
+async function scrape_page(page, pageUrl) {
   try {
     await page.waitForNavigation({
       waitUntil: "networkidle0",
@@ -60,7 +60,7 @@ const init = async () => {
   const pagePromises = pagesToScrape.map(async (pageToScrape) => {
     const page = await browser.newPage();
     await page.goto(pageToScrape);
-    return run_page(page, pageToScrape);
+    return scrape_page(page, pageToScrape);
   });
 
   const result = await Promise.allSettled(pagePromises);
@@ -72,7 +72,7 @@ const init = async () => {
   await browser.close();
   console.log(JSON.stringify(toLog));
   endTime = performance.now();
-  console.log(`Call to doSomething took ${endTime - startTime} milliseconds`);
+  console.log(`Scrape the given AirBnb pages took ${endTime - startTime} milliseconds`);
 };
 
 init();
