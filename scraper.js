@@ -1,56 +1,78 @@
 const puppeteer = require("puppeteer");
+const { performance } = require("perf_hooks");
+
 // property name
 // property type (e.g Apartment)
 // number of bedrooms
 // bathrooms
 // list of the amenities
 
-function run_page(pageToScrape) {
-  return new Promise(async (resolve, reject) => {
-    try {
-      const browser = await puppeteer.launch();
-      const page = await browser.newPage();
-      await page.goto(pageToScrape);
+const pagesToScrape = [
+  "https://www.airbnb.co.uk/rooms/33571268",
+  "https://www.airbnb.co.uk/rooms/20669368",
+  "https://www.airbnb.co.uk/rooms/50633275",
+];
 
-      await page.waitForNavigation({
-        waitUntil: "networkidle0",
+async function run_page(page, pageUrl) {
+  try {
+    await page.waitForNavigation({
+      waitUntil: "networkidle0",
+    });
+    let baseProp = await page.evaluate(() => {
+      const numberRegexp = /\d+/;
+
+      let propertyName = document.querySelector("span._1n81at5").innerText;
+      let propertyType = document.querySelector("div._1qsawv5").innerText;
+      let bedroomsNumber = document
+        .querySelector("ol._194e2vt2 li:nth-child(2)")
+        .innerText.match(numberRegexp)[0];
+      let bathroomsNumber = document
+        .querySelector("ol._194e2vt2 li:nth-child(4)")
+        .innerText.match(numberRegexp)[0];
+      return { propertyName, propertyType, bedroomsNumber, bathroomsNumber };
+    });
+    await page.click("div.b6xigss > a");
+    await page.waitForSelector("div._1b2umrx");
+    let amenities = await page.evaluate(() => {
+      const result = {};
+      Array.from(document.querySelectorAll("div._1b2umrx")).forEach((e) => {
+        const children = Array.from(e.childNodes);
+        const header = children.shift().innerText;
+        const rest = children;
+
+        const textNodes = rest.map((item) => item.innerText);
+        result[header] = textNodes;
       });
+      return result;
+    });
 
-      let baseProp = await page.evaluate(() => {
-        const numberRegexp = /\d+/;
-
-        let propertyName = document.querySelector("span._1n81at5").innerText;
-        let propertyType = document.querySelector("div._1qsawv5").innerText;
-        let bedroomsNumber = document
-          .querySelector("ol._194e2vt2 li:nth-child(2)")
-          .innerText.match(numberRegexp)[0];
-        let bathroomsNumber = document
-          .querySelector("ol._194e2vt2 li:nth-child(4)")
-          .innerText.match(numberRegexp)[0];
-        return { propertyName, propertyType, bedroomsNumber, bathroomsNumber };
-      });
-      await page.click("div.b6xigss > a");
-      await page.waitForSelector("div._1b2umrx");
-      let amenities = await page.evaluate(() => {
-        const result = {};
-        Array.from(document.querySelectorAll("div._1b2umrx")).forEach((e) => {
-          const children = Array.from(e.childNodes);
-          const header = children.shift().innerText;
-          const rest = children;
-
-          const textNodes = rest.map((item) => item.innerText);
-          result[header] = textNodes;
-        });
-        return result;
-      });
-
-      await browser.close();
-      return resolve({ ...baseProp, amenities });
-    } catch (e) {
-      return reject(e);
-    }
-  });
+    return { [pageUrl]: { ...baseProp, amenities } };
+  } catch (err) {
+    throw {[pageUrl]: `Page ${pageUrl} failed to load`};
+  }
 }
-run_page("https://www.airbnb.co.uk/rooms/20669368")
-  .then(console.log)
-  .catch(console.error);
+
+const init = async () => {
+  let startTime = performance.now();
+  let endTime;
+  const browser = await puppeteer.launch({ timeout: 50000 });
+
+  const pagePromises = pagesToScrape.map(async (pageToScrape) => {
+    const page = await browser.newPage();
+    await page.goto(pageToScrape);
+    return run_page(page, pageToScrape);
+  });
+
+  const result = await Promise.allSettled(pagePromises);
+  const toLog = result.map((res) => {
+    if (res.status === "fulfilled") return res.value;
+    if (res.status === "rejected") return res.reason;
+  });
+
+  await browser.close();
+  console.log(JSON.stringify(toLog));
+  endTime = performance.now();
+  console.log(`Call to doSomething took ${endTime - startTime} milliseconds`);
+};
+
+init();

@@ -1,0 +1,15 @@
+{
+  "name": "airbnb-scraper",
+  "version": "1.0.0",
+  "description": "",
+  "main": "scraper.js",
+  "dependencies": {
+    "puppeteer": "^11.0.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "start": "node scraper.js"
+  },
+  "author": "",
+  "license": "ISC"
+}
